@@ -1,12 +1,14 @@
 # typeless-reset-device
 
-**Reset the Typeless device identifier with one command**
+**Reset the Typeless macOS device identifier with one command**
 
 [中文](README.md) | English
 
 ---
 
 ## Background
+
+> Only the macOS script has been verified with Typeless v1.1.0. The Windows version has been removed, and other Typeless versions are not guaranteed to work correctly.
 
 New Typeless accounts come with a one-month free Pro trial. After logging into multiple accounts on the same machine, you may see:
 
@@ -18,10 +20,10 @@ This happens because Typeless sends a **Device ID** with every server request. T
 
 ## How it works (reverse-engineered)
 
-The Device ID comes from a native library (`libUtilHelper.dylib` on macOS) and is resolved in this order:
+The Device ID comes from the macOS native library `libUtilHelper.dylib` and is resolved in this order:
 
 ```
-1. Read from Keychain (macOS) / Credential Manager (Windows)
+1. Read from Keychain
    └─ found → use it
    └─ not found ↓
 2. Read from local cache file
@@ -31,20 +33,16 @@ The Device ID comes from a native library (`libUtilHelper.dylib` on macOS) and i
    └─ write to Keychain + local cache
 ```
 
-Device ID storage locations:
+Device ID storage locations on macOS:
 
-| Platform | Store | Location |
-|----------|-------|----------|
-| macOS | Keychain | service: `now.typeless.desktop` · account: `.deviceIdentifier` |
-| macOS | Local cache | `~/Library/Application Support/now.typeless.desktop/device.cache` |
-| Windows | Credential Manager | `Typeless.deviceIdentifier` |
-| Windows | Local cache | `%APPDATA%\Typeless\Cache\device.cache` |
+| Store | Location |
+|-------|----------|
+| Keychain | service: `now.typeless.desktop` · account: `.deviceIdentifier` |
+| Local cache | `~/Library/Application Support/now.typeless.desktop/device.cache` |
 
 Wipe both locations and Typeless generates a brand-new Device ID on the next launch — the server sees a fresh machine.
 
 ## Usage
-
-**macOS**
 
 ```bash
 bash reset-device-macos.sh
@@ -55,22 +53,16 @@ bash reset-device-macos.sh
 > TYPELESS_APP_PATH=/path/to/Typeless.app bash reset-device-macos.sh
 > ```
 
-**Windows**
-
-```powershell
-powershell -ExecutionPolicy Bypass -File reset-device-windows.ps1
-```
-
 ## What the script does
 
 | Step | Action |
 |------|--------|
 | 1 | Force-quit Typeless |
 | 2 | Delete `device.cache` (server-assigned device UUID) |
-| 3 | Remove the Keychain / Credential Manager entry |
+| 3 | Remove the Keychain entry |
 | 4 | Delete `user-data.json` (encrypted login state) |
 | 5 | Clear `userData` / `quotaUsage` from `app-storage.json` |
-| 6 | Wipe login cookies and Local Storage (macOS only) |
+| 6 | Wipe login cookies and Local Storage |
 | 7 | Relaunch Typeless → fresh Device ID generated on startup |
 
 You will need to log back into your Typeless account after running the script.
@@ -80,8 +72,7 @@ You will need to log back into your Typeless account after running the script.
 ```
 ├── README.md                   # Chinese README
 ├── README.en.md                # English README
-├── reset-device-macos.sh       # macOS reset script (bash)
-└── reset-device-windows.ps1    # Windows reset script (PowerShell)
+└── reset-device-macos.sh       # macOS reset script (bash)
 ```
 
 ## License
