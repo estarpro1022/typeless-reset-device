@@ -1,6 +1,6 @@
 # typeless-reset-device
 
-**解除 Typeless macOS 设备登录限制 + 迁移个人词典到新账号**
+**解除 Typeless (macOS / Windows) 设备登录限制 + 迁移个人数据到新账号**
 
 中文 | [English](README.en.md)
 
@@ -8,29 +8,21 @@
 
 ## 背景
 
-> Typeless v1.3.0，macOS 版
+> 适配 Typeless v1.3.0 (macOS & Windows)
 
-Typeless 新注册账号可以免费试用 Pro 一个月。但当你在同一台设备上登录多个账号后，会出现以下报错：
+Typeless 新注册账号可以免费试用 Pro 一个月。但在同一台设备上登录多个账号后，会出现以下报错：
+`The number of users logged into this device has exceeded the limit.`
 
-```
-The number of users logged into this device has exceeded the limit.
-```
+这是因为 Typeless 会在请求服务端时携带由设备指纹生成的 **Device ID**。本工具通过逆向其加密协议与本地存储机制，实现以下功能：
 
-这是因为 Typeless 会在每次请求服务端时携带一个 **Device ID**，服务端通过这个标识来限制单台设备的登录账号数量。
-
-本工具提供两件事：
-1. **重置 Device ID** — 让服务端把当前机器视为新设备
-2. **迁移账号数据** — 包括个人词典（云端 API）、历史记录、录音文件
-
-如果只是想解决多设备登录问题，那么直接 `bash reset-device-macos.sh` 重置设备ID即可，登录新账号不再出现报上述错误（可以白嫖啦！）
-
-如果想顺便把账号数据做迁移，可继续阅读↓↓↓
+1.  **重置设备指纹** — 让服务端将当前机器视为“全新设备”，从而绕过账号数量限制（白嫖 Pro 试用）。
+2.  **全量数据迁移** — 包含云端个人词典（API 级导出/导入）、本地历史记录（SQLite 迁移）、录音文件（.ogg）及应用设置。
 
 ## 环境要求
 
-- macOS / Windows
-- Python 3.9+（通过 uv 管理依赖）
-- [uv](https://docs.astral.sh/uv/)（Python 包管理器）
+- **操作系统**: macOS / Windows 10+
+- **Python**: 3.9+ (建议通过 [uv](https://docs.astral.sh/uv/) 管理)
+- **依赖管理**: 项目已配置好 `pyproject.toml`
 
 ```bash
 # 安装 uv (macOS)
@@ -38,106 +30,51 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # 安装 uv (Windows - PowerShell)
 powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 
-# 安装依赖
+# 初始化环境
 uv sync
 ```
 
 ## 使用方法
 
-### 方式一：图形界面（推荐）
+### 方式一：图形界面（推荐 🌟）
+
+项目提供了一键式图形界面，适合所有用户：
 
 ```bash
 uv run python gui.py
 ```
-启动后按照界面上的“步骤 1, 2, 3”依次点击即可完成备份、重置和恢复。
+
+启动后，只需按照界面显示的 **步骤 1 (备份) -> 步骤 2 (重置) -> 步骤 3 (恢复)** 依次点击即可。
 
 ### 方式二：命令行流程
 
-```bash
-# 1. 登录旧账号，导出所有数据
-uv run python export.py
-# → 创建 backup_<时间戳>/ 目录，包含词典、数据库、录音、设置
+1.  **导出数据**: `uv run python export.py` (生成 `backup_<时间戳>/` 文件夹)
+2.  **重置设备**: `uv run python reset.py` (自动强杀进程并清理标识)
+3.  **切换账号**: 打开 Typeless 登录你的 **新账号**。
+4.  **导入数据**: `uv run python import.py backup_<时间戳>/`
 
-# 2. 重置设备 ID
-uv run python reset.py
+## 原理 (逆向分析)
 
-# 3. 在 Typeless 中登录新账号
+### 1. 设备指纹 (Device ID)
+Device ID 存储于系统凭据（Keychain/Credential Manager）及本地 `device.cache` 中。
+- **macOS**: `~/Library/Application Support/now.typeless.desktop/device.cache`
+- **Windows**: `%APPDATA%\Typeless\Cache\device.cache`
 
-# 4. 导入数据到新账号
-uv run python import.py backup_<时间戳>/
-```
+### 2. 加密逻辑 (Encryption)
+应用使用 `electron-store` 加密 `user-data.json`。
+- **密钥派生**: 基于平台标识 (`win32-x64` 或 `darwin-arm64`) 与应用名称 (`Typeless.exe` 或 `Typeless`) 进行双重 PBKDF2 哈希。
+- **协议模拟**: 工具实现了完整的 HMAC-SHA1 签名与 CryptoJS AES 加密协议，直接与 API 通信以导出云端词典。
 
-## 原理（逆向分析）
-
-### Device ID
-
-Device ID 在各平台的存储位置：
-
-| 平台 | 位置 |
-|------|------|
-| macOS Keychain | service: `now.typeless.desktop.deviceIdentifier` · account: `now.typeless.desktop.security.auth_key` |
-| macOS 本地 cache | `~/Library/Application Support/now.typeless.desktop/device.cache` |
-| Windows 本地 cache | `%APPDATA%\now.typeless.desktop\device.cache` |
-
-把这些位置清干净，下次启动 Typeless 就会生成全新的 Device ID，服务端将其视为一台新设备。
-
-### 词典 API
-
-词典数据仅存储在 Typeless 服务端，本地无任何副本。`export.py` / `import.py` 通过逆向 Typeless 的 API 签名协议直接调用云端接口：
-
-1. 解密 `user-data.json`（electron-store 加密：双重 PBKDF2 + AES-256-CBC）
-2. 构造 API 安全请求头（HMAC-SHA1 签名 + CryptoJS AES 加密的 `X-Authorization`）
-3. 调用 `/user/dictionary/list`（导出）和 `/user/dictionary/add`（导入）
-
-### 本地数据库
-
-`typeless.db` 中 `history` 表每行记录都有一个 `user_id` 字段，绑定到特定账号。迁移时将该字段从旧 `user_id` 更新为新 `user_id`，录音文件（`.ogg`）无需修改。
-
-### 加密细节
-
-`user-data.json` 使用 Electron 的 `electron-store`（conf v13）加密：
-
-```
-加密密钥 = PBKDF2-SHA256(SHA256("darwin-{arch}").hex() + "Typeless", "typeless-user-service", 10000, 32)
-逐值密钥 = PBKDF2-SHA512(加密密钥, IV.toUtf8(), 10000, 32)
-文件格式 = [16字节 IV] + ':' + [AES-256-CBC 密文]
-```
-
-其中 `arch` 为 `arm64`（Apple Silicon）或 `x64`（Intel Mac），自动检测。
-
-## reset-device-macos.sh 做了什么
-
-| 步骤 | 说明 |
-|------|------|
-| 1 | 强制退出 Typeless |
-| 2 | 删除 `device.cache`（服务端下发的设备 UUID） |
-| 3 | 移除 Keychain 中的设备标识条目 |
-| 4 | 删除 `user-data.json`（加密的登录态文件） |
-| 5 | 清除 `app-storage.json` 中的 `userData` / `quotaUsage` 字段 |
-| 6 | 删除登录 Cookie 及 Local Storage |
-| 7 | 重新启动 Typeless（自动生成新 Device ID） |
-
-运行后需要重新登录 Typeless 账号。
+### 3. 数据隔离绕过
+本地数据库 `typeless.db` 的每条历史记录都绑定了旧账号的 `user_id`。迁移工具会自动将数据库中的所有记录更新为新账号的 `user_id`，实现无缝对接。
 
 ## 文件结构
 
-```
-├── README.md                   # 中文 README
-├── README.en.md                # English README
-├── reset-device-macos.sh       # macOS 重置脚本（bash）
-├── export.py                   # 导出所有数据（词典 + 数据库 + 录音 + 设置）
-├── import.py                   # 导入所有数据到新账号
-├── crypto_utils.py             # 加密与签名工具库
-├── pyproject.toml              # Python 项目配置
-└── .gitignore
-```
-
-## 参考
-
-这里感谢以下仓库，借鉴了其中的实现：
-
-* [mercy719/typeless-migrator](https://github.com/mercy719/typeless-migrator)
-* [schummiking/free-typeless](https://github.com/schummiking/free-typeless)
+- `gui.py`: 跨平台图形化操作界面。
+- `reset.py`: 统一的设备重置脚本（替代了旧版 bash 脚本）。
+- `crypto_utils.py`: 核心加密/签名工具库，适配双端路径与盐值。
+- `export.py` / `import.py`: 数据的导出与恢复引擎。
+- `DEV_PLAN.md`: 详细的开发蓝图与任务历史。
 
 ## 许可证
 

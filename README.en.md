@@ -1,6 +1,6 @@
 # typeless-reset-device
 
-**Reset the Typeless macOS device identifier + migrate account data to a new account**
+**Bypass Typeless (macOS / Windows) login limits + Migrate personal data to a new account**
 
 [中文](README.md) | English
 
@@ -8,29 +8,21 @@
 
 ## Background
 
-> Typeless v1.3.0, macOS
+> Supports Typeless v1.3.0 (macOS & Windows)
 
-New Typeless accounts come with a one-month free Pro trial. After logging into multiple accounts on the same machine, you may see:
+New Typeless accounts include a one-month free Pro trial. However, logging into multiple accounts on the same device triggers the error:
+`The number of users logged into this device has exceeded the limit.`
 
-```
-The number of users logged into this device has exceeded the limit.
-```
+Typeless identifies devices using a **Device ID** generated from hardware fingerprints. This tool reverse-engineers the application's encryption and local storage mechanisms to provide:
 
-This happens because Typeless sends a **Device ID** with every server request. The server uses this fingerprint to enforce a per-device account cap.
-
-This tool provides two things:
-1. **Reset Device ID** — makes the server treat your machine as a new device
-2. **Migrate account data** — including personal dictionary (cloud API), history records, and recordings
-
-If you just want to solve the device limit issue, simply run `bash reset-device-macos.sh` to reset the device ID. You can then login with a new account without seeing the error above (free trial!).
-
-If you also want to migrate your data, keep reading ↓↓↓
+1.  **Device Fingerprint Reset** — Makes the server treat your machine as a "brand new device," bypassing account limits.
+2.  **Full Data Migration** — Includes cloud-based personal dictionaries (API-level export/import), local history (SQLite migration), voice recordings (.ogg), and app settings.
 
 ## Requirements
 
-- macOS / Windows
-- Python 3.9+ (managed via uv)
-- [uv](https://docs.astral.sh/uv/) (Python package manager)
+- **OS**: macOS / Windows 10+
+- **Python**: 3.9+ (Highly recommend using [uv](https://docs.astral.sh/uv/))
+- **Dependency Management**: Pre-configured via `pyproject.toml`
 
 ```bash
 # Install uv (macOS)
@@ -38,107 +30,52 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # Install uv (Windows - PowerShell)
 powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 
-# Install dependencies
+# Initialize environment
 uv sync
 ```
 
 ## Usage
 
-### Option 1: Graphical Interface (Recommended)
+### Option 1: Graphical Interface (Recommended 🌟)
+
+A user-friendly one-click GUI is provided for all users:
 
 ```bash
 uv run python gui.py
 ```
-After launching, simply follow "Step 1, 2, 3" in the window to complete the backup, reset, and restore process.
 
-### Option 2: Command Line Workflow
+Simply follow **Step 1 (Backup) -> Step 2 (Reset) -> Step 3 (Restore)** as shown in the interface.
 
-```bash
-# 1. Login to OLD account, export all data
-uv run python export.py
-# → creates backup_<timestamp>/ with dictionary, database, recordings, settings
+### Option 2: CLI Workflow
 
-# 2. Reset device ID
-uv run python reset.py
+1.  **Export Data**: `uv run python export.py` (Creates a `backup_<timestamp>/` folder)
+2.  **Reset Device**: `uv run python reset.py` (Kills app processes and wipes identifiers)
+3.  **Switch Account**: Open Typeless and log in to your **NEW account**.
+4.  **Import Data**: `uv run python import.py backup_<timestamp>/`
 
-# 3. Login to NEW account in Typeless
+## How it works (Reverse Engineering)
 
-# 4. Import data to new account
-uv run python import.py backup_<timestamp>/
-```
+### 1. Device Fingerprint (Device ID)
+The Device ID is stored in system credentials (Keychain/Credential Manager) and local `device.cache` files.
+- **macOS**: `~/Library/Application Support/now.typeless.desktop/device.cache`
+- **Windows**: `%APPDATA%\Typeless\Cache\device.cache`
 
+### 2. Encryption
+The app uses `electron-store` to encrypt `user-data.json`.
+- **Key Derivation**: Based on platform identifiers (`win32-x64` or `darwin-arm64`) and app names (`Typeless.exe` or `Typeless`) using double PBKDF2 hashing.
+- **Protocol Simulation**: We implemented the full HMAC-SHA1 signature and CryptoJS AES encryption protocols to communicate directly with the API for dictionary export.
 
-## How it works (reverse-engineered)
+### 3. Data Isolation Bypass
+Each history record in `typeless.db` is bound to the old account's `user_id`. The migrator automatically updates all records to the new account's ID, ensuring a seamless transition.
 
-### Device ID
+## File Structure
 
-Device ID storage locations:
+- `gui.py`: Cross-platform graphical user interface.
+- `reset.py`: Unified reset script (replaces the legacy bash script).
+- `crypto_utils.py`: Core encryption/signing library, adapted for both platforms.
+- `export.py` / `import.py`: Data extraction and restoration engines.
+- `DEV_PLAN.md`: Detailed development roadmap and task history.
 
-| Platform | Location |
-|-------|----------|
-| macOS Keychain | service: `now.typeless.desktop.deviceIdentifier` · account: `now.typeless.desktop.security.auth_key` |
-| macOS Local cache | `~/Library/Application Support/now.typeless.desktop/device.cache` |
-| Windows Local cache | `%APPDATA%\now.typeless.desktop\device.cache` |
-
-Clean these spots, and the next time you start Typeless, it will generate a completely new Device ID, which the server will treat as a new device.
-
-### Dictionary API
-
-Dictionary data is stored only on Typeless servers — there is no local copy. `export.py` / `import.py` call the cloud API directly by reverse-engineering Typeless's API signing protocol:
-
-1. Decrypt `user-data.json` (electron-store encryption: double PBKDF2 + AES-256-CBC)
-2. Build API security headers (HMAC-SHA1 signature + CryptoJS AES encrypted `X-Authorization` header)
-3. Call `/user/dictionary/list` (export) and `/user/dictionary/add` (import)
-
-### Local database
-
-Each row in `typeless.db`'s `history` table has a `user_id` field binding it to a specific account. Migration updates this field from the old `user_id` to the new one. Recording files (`.ogg`) require no modification.
-
-### Encryption details
-
-`user-data.json` is encrypted using Electron's `electron-store` (conf v13):
-
-```
-encryption_key = PBKDF2-SHA256(SHA256("darwin-{arch}").hex() + "Typeless", "typeless-user-service", 10000, 32)
-value_key     = PBKDF2-SHA512(encryption_key, IV.toUtf8(), 10000, 32)
-file format   = [16-byte IV] + ':' + [AES-256-CBC ciphertext]
-```
-
-Where `arch` is `arm64` (Apple Silicon) or `x64` (Intel Mac), auto-detected.
-
-## What reset-device-macos.sh does
-
-| Step | Action |
-|------|--------|
-| 1 | Force-quit Typeless |
-| 2 | Delete `device.cache` (server-assigned device UUID) |
-| 3 | Remove the Keychain entry |
-| 4 | Delete `user-data.json` (encrypted login state) |
-| 5 | Clear `userData` / `quotaUsage` from `app-storage.json` |
-| 6 | Wipe login cookies and Local Storage |
-| 7 | Relaunch Typeless → fresh Device ID generated on startup |
-
-You will need to log back into your Typeless account after running the script.
-
-## File structure
-
-```
-├── README.md                   # Chinese README
-├── README.en.md                # English README
-├── reset-device-macos.sh       # macOS reset script (bash)
-├── export.py                   # Export all data (dictionary + db + recordings + settings)
-├── import.py                   # Import all data into new account
-├── crypto_utils.py             # Encryption & signing utilities
-├── pyproject.toml              # Python project config
-└── .gitignore
-```
-
-## References
-
-Special thanks to the following repositories for reference:
-
-* [mercy719/typeless-migrator](https://github.com/mercy719/typeless-migrator)
-* [schummiking/free-typeless](https://github.com/schummiking/free-typeless)
 
 ## License
 
