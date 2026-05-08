@@ -28,60 +28,58 @@ The number of users logged into this device has exceeded the limit.
 
 ## 环境要求
 
-- macOS
+- macOS / Windows
 - Python 3.9+（通过 uv 管理依赖）
 - [uv](https://docs.astral.sh/uv/)（Python 包管理器）
 
 ```bash
-# 安装 uv
+# 安装 uv (macOS)
 curl -LsSf https://astral.sh/uv/install.sh | sh
+# 安装 uv (Windows - PowerShell)
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+
 # 安装依赖
 uv sync
 ```
 
 ## 使用方法
 
-### 完整流程：重置设备 + 迁移数据
+### 方式一：图形界面（推荐）
+
+```bash
+uv run python gui.py
+```
+启动后按照界面上的“步骤 1, 2, 3”依次点击即可完成备份、重置和恢复。
+
+### 方式二：命令行流程
 
 ```bash
 # 1. 登录旧账号，导出所有数据
-uv run python3 export.py
+uv run python export.py
 # → 创建 backup_<时间戳>/ 目录，包含词典、数据库、录音、设置
 
 # 2. 重置设备 ID
-bash reset-device-macos.sh
+uv run python reset.py
 
 # 3. 在 Typeless 中登录新账号
 
 # 4. 导入数据到新账号
-uv run python3 import.py backup_<时间戳>/
+uv run python import.py backup_<时间戳>/
 ```
 
 ## 原理（逆向分析）
 
 ### Device ID
 
-Device ID 来自 macOS 原生动态库 `libUtilHelper.dylib`，读取顺序如下：
+Device ID 在各平台的存储位置：
 
-```
-1. 读 Keychain
-   └─ 找到 → 使用该值
-   └─ 未找到 ↓
-2. 读本地 cache 文件
-   └─ 找到 → 使用该值，并同步回 Keychain
-   └─ 未找到 ↓
-3. 生成新 UUID
-   └─ 写入 Keychain + 本地 cache
-```
-
-Device ID 在 macOS 的存储位置：
-
-| 存储 | 位置 |
+| 平台 | 位置 |
 |------|------|
-| Keychain | service: `now.typeless.desktop.deviceIdentifier` · account: `now.typeless.desktop.security.auth_key` |
-| 本地 cache | `~/Library/Application Support/now.typeless.desktop/device.cache` |
+| macOS Keychain | service: `now.typeless.desktop.deviceIdentifier` · account: `now.typeless.desktop.security.auth_key` |
+| macOS 本地 cache | `~/Library/Application Support/now.typeless.desktop/device.cache` |
+| Windows 本地 cache | `%APPDATA%\now.typeless.desktop\device.cache` |
 
-把这两处清干净，下次启动 Typeless 就会生成全新的 Device ID，服务端将其视为一台新设备。
+把这些位置清干净，下次启动 Typeless 就会生成全新的 Device ID，服务端将其视为一台新设备。
 
 ### 词典 API
 

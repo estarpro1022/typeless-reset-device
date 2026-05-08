@@ -28,65 +28,59 @@ If you also want to migrate your data, keep reading ↓↓↓
 
 ## Requirements
 
-- macOS
+- macOS / Windows
 - Python 3.9+ (managed via uv)
 - [uv](https://docs.astral.sh/uv/) (Python package manager)
 
 ```bash
-# Install uv
+# Install uv (macOS)
 curl -LsSf https://astral.sh/uv/install.sh | sh
+# Install uv (Windows - PowerShell)
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+
 # Install dependencies
 uv sync
 ```
 
 ## Usage
 
-### Full workflow: Reset device + migrate data
+### Option 1: Graphical Interface (Recommended)
+
+```bash
+uv run python gui.py
+```
+After launching, simply follow "Step 1, 2, 3" in the window to complete the backup, reset, and restore process.
+
+### Option 2: Command Line Workflow
 
 ```bash
 # 1. Login to OLD account, export all data
-uv run python3 export.py
+uv run python export.py
 # → creates backup_<timestamp>/ with dictionary, database, recordings, settings
 
 # 2. Reset device ID
-bash reset-device-macos.sh
+uv run python reset.py
 
 # 3. Login to NEW account in Typeless
 
 # 4. Import data to new account
-uv run python3 import.py backup_<timestamp>/
+uv run python import.py backup_<timestamp>/
 ```
 
-> If Typeless is installed in a non-default location, set the path override:
-> ```bash
-> TYPELESS_APP_PATH=/path/to/Typeless.app bash reset-device-macos.sh
-> ```
 
 ## How it works (reverse-engineered)
 
 ### Device ID
 
-The Device ID comes from the macOS native library `libUtilHelper.dylib` and is resolved in this order:
+Device ID storage locations:
 
-```
-1. Read from Keychain
-   └─ found → use it
-   └─ not found ↓
-2. Read from local cache file
-   └─ found → use it, sync back to Keychain
-   └─ not found ↓
-3. Generate a new UUID
-   └─ write to Keychain + local cache
-```
-
-Device ID storage locations on macOS:
-
-| Store | Location |
+| Platform | Location |
 |-------|----------|
-| Keychain | service: `now.typeless.desktop.deviceIdentifier` · account: `now.typeless.desktop.security.auth_key` |
-| Local cache | `~/Library/Application Support/now.typeless.desktop/device.cache` |
+| macOS Keychain | service: `now.typeless.desktop.deviceIdentifier` · account: `now.typeless.desktop.security.auth_key` |
+| macOS Local cache | `~/Library/Application Support/now.typeless.desktop/device.cache` |
+| Windows Local cache | `%APPDATA%\now.typeless.desktop\device.cache` |
 
-Clean these two spots, and the next time you start Typeless, it will generate a completely new Device ID, which the server will treat as a new device.
+Clean these spots, and the next time you start Typeless, it will generate a completely new Device ID, which the server will treat as a new device.
 
 ### Dictionary API
 
