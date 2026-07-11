@@ -8,7 +8,7 @@
 
 ## Background
 
-> Typeless v1.8.0, macOS
+> Typeless v2.0.0, macOS
 
 New Typeless accounts come with a one-month free Pro trial (**Note**: accounts registered with custom domain emails no longer qualify for the free trial. Use a regular email provider like Gmail instead). After logging into multiple accounts on the same machine, you may see:
 
@@ -98,7 +98,7 @@ Dictionary data is stored only on Typeless servers — there is no local copy. `
 
 ### Local database
 
-Each row in `typeless.db`'s `history` and `history_v2` tables has a `user_id` field binding it to a specific account (since v1.8.0, `history_v2` is the active table; `history` is legacy). Migration updates this field from the old `user_id` to the new one. Recording files (`.ogg`) require no modification.
+Each row in `typeless.db`'s `history` and `history_v2` tables has a `user_id` field binding it to a specific account (since v1.8.0, `history_v2` is the active table; `history` is legacy, same in v2.0.0). Migration updates this field from the old `user_id` to the new one. Recording files (`.ogg`) require no modification.
 
 ### Encryption details
 

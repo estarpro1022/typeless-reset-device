@@ -250,7 +250,7 @@ def restore_recordings(backup_dir):
         else:
             print(f"[rec] All {existing} recordings already present, skipping.")
     else:
-        shutil.copytree(src, dst)
+        shutil.copytree(src, dst, dirs_exist_ok=True)
         ogg_count = len([f for f in os.listdir(dst) if f.endswith(".ogg")])
         print(f"[rec] Copied {ogg_count} .ogg files")
 

@@ -8,7 +8,7 @@
 
 ## 背景
 
-> Typeless v1.8.0，macOS 版
+> Typeless v2.0.0，macOS 版
 
 Typeless 新注册账号可以免费试用 Pro 一个月（**注意**：使用域名邮箱注册的账号不再享受免费试用，请用 Gmail 等常规邮箱注册）。但当你在同一台设备上登录多个账号后，会出现以下报错：
 
@@ -93,7 +93,7 @@ Device ID 在 macOS 的存储位置：
 
 ### 本地数据库
 
-`typeless.db` 中 `history` 和 `history_v2` 表每行记录都有一个 `user_id` 字段，绑定到特定账号（v1.8.0 起实际使用 `history_v2`，`history` 为遗留表）。迁移时将该字段从旧 `user_id` 更新为新 `user_id`，录音文件（`.ogg`）无需修改。
+`typeless.db` 中 `history` 和 `history_v2` 表每行记录都有一个 `user_id` 字段，绑定到特定账号（v1.8.0 起实际使用 `history_v2`，`history` 为遗留表，v2.0.0 保持一致）。迁移时将该字段从旧 `user_id` 更新为新 `user_id`，录音文件（`.ogg`）无需修改。
 
 ### 加密细节
 
