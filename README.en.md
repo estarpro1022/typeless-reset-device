@@ -29,7 +29,7 @@ If you also want to migrate your data, keep reading ↓↓↓
 ## Requirements
 
 - macOS
-- Python 3.9+ (managed via uv)
+- Python 3.10+ (managed via uv)
 - [uv](https://docs.astral.sh/uv/) (Python package manager)
 
 ```bash

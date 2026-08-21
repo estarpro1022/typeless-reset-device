@@ -29,7 +29,7 @@ The number of users logged into this device has exceeded the limit.
 ## 环境要求
 
 - macOS
-- Python 3.9+（通过 uv 管理依赖）
+- Python 3.10+（通过 uv 管理依赖）
 - [uv](https://docs.astral.sh/uv/)（Python 包管理器）
 
 ```bash
