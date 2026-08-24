@@ -5,3 +5,4 @@ __pycache__/
 uv.lock
 .python-version
 backup*
+backups/
