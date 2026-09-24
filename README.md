@@ -1,3 +1,5 @@
+> 由于 Typeless 已经不再赠送免费试用 Pro 会员，以及周额度从 8000 降到了 2000，所以本项目将不再维护。不过可以借鉴 Device Reset 的相关实现
+
 # typeless-reset-device
 
 **解除 Typeless macOS 设备登录限制 + 迁移个人词典到新账号**

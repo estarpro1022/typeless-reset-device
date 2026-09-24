@@ -1,3 +1,5 @@
+> As Typeless no longer offers a free Pro trial and the weekly quota has been reduced from 8,000 to 2,000, this project will no longer be maintained. However, you can refer to the implementation of Device Reset for reference.
+
 # typeless-reset-device
 
 **Reset the Typeless macOS device identifier + migrate account data to a new account**
